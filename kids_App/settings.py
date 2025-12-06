@@ -41,7 +41,7 @@ INSTALLED_APPS = [
     'core.apps.CoreConfig', 
     'users.apps.UsersConfig',
     'content.apps.ContentConfig',
-    'learning.apps.LearingConfig',
+    'learning.apps.LearningConfig',
     'messaging.apps.MessagingConfig',
     'analytics.apps.AnalyticsConfig'
 ]   
