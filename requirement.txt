@@ -1,0 +1,19 @@
+# Core testing & linting tools
+pytest
+flake8
+black
+
+# Add your backend dependencies here
+# Example Django dependencies (if your backend is Django-based):
+# Django>=4.2,<5.0
+# djangorestframework
+# gunicorn
+
+# Example ML packages (if used in backend):
+# numpy
+# pandas
+# scikit-learn
+
+# Add any other libraries your backend uses:
+# requests
+# python-dotenv
