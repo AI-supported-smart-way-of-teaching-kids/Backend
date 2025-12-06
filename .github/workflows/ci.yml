@@ -1,5 +1,4 @@
 name: CI
-
 on:
   push:
     branches: [ main, develop ]
@@ -7,13 +6,9 @@ on:
     branches: [ main, develop ]
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      # ... checkout step ...
-      - uses: actions/setup-python@v4
-        # FIX: Align 'with:' two spaces deeper than '- uses:'
-        with:
-          python-version: '3.13.2'
-      # ... subsequent run steps ...
+  backend:
+    uses: AI-supported-smart-way-of-teaching-kids/.github/.github/workflows/backend-ci.yml@main
+    with:
+      python-version: '3.13.2'
+
 
