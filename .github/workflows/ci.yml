@@ -7,7 +7,7 @@ on:
 
 jobs:
   backend:
-    uses: AI-supported-smart-way-of-teaching-kids/.github/workflows/backend-ci.yml@main
+    uses: AI-supported-smart-way-of-teaching-kids/Backend/.github/workflows/backend-ci.yml@main
     with:
       python-version: '3.13.2'
 
