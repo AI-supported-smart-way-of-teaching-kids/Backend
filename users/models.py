@@ -1,7 +1,9 @@
-
+from django.contrib.auth.models import (AbstractBaseUser, BaseUserManager,
+                                        PermissionsMixin)
 from django.db import models
-from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
-from core.models import TimeStampedModel, Role
+
+from core.models import Role, TimeStampedModel
+
 
 class UserManager(BaseUserManager):
     use_in_migrations = True
@@ -33,11 +35,13 @@ class UserManager(BaseUserManager):
             raise ValueError("Superuser must have is_superuser=True")
         return self._create_user(email, password, **extra_fields)
 
+
 class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
     """
     AUTH_USER_MODEL: central user record for all roles.
     Use email as username field.
     """
+
     email = models.EmailField(unique=True, db_index=True)
     full_name = models.CharField(max_length=255, blank=True)
     role = models.CharField(max_length=16, choices=Role.choices, db_index=True)
@@ -53,24 +57,38 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
     def __str__(self):
         return f"{self.email} ({self.role})"
 
+
 class KidProfile(TimeStampedModel):
     """
     1:1 profile for kids (linked to User with role='kid').
     """
-    user = models.OneToOneField("users.User", on_delete=models.CASCADE, related_name="kid_profile")
+
+    user = models.OneToOneField(
+        "users.User", on_delete=models.CASCADE, related_name="kid_profile"
+    )
     date_of_birth = models.DateField(null=True, blank=True)
     preferred_language = models.CharField(max_length=32, null=True, blank=True)
     level_estimate = models.CharField(max_length=64, null=True, blank=True)
-    parent_primary = models.ForeignKey("users.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="primary_children")
+    parent_primary = models.ForeignKey(
+        "users.User",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="primary_children",
+    )
 
     def __str__(self):
         return f"KidProfile: {self.user.email}"
+
 
 class TeacherProfile(TimeStampedModel):
     """
     1:1 profile for teachers.
     """
-    user = models.OneToOneField("users.User", on_delete=models.CASCADE, related_name="teacher_profile")
+
+    user = models.OneToOneField(
+        "users.User", on_delete=models.CASCADE, related_name="teacher_profile"
+    )
     bio = models.TextField(blank=True, null=True)
     institution = models.CharField(max_length=255, blank=True, null=True)
     verified = models.BooleanField(default=False)
@@ -78,13 +96,19 @@ class TeacherProfile(TimeStampedModel):
     def __str__(self):
         return f"TeacherProfile: {self.user.email}"
 
+
 class ParentChildLink(models.Model):
     """
     Many-to-many join table (parent User) <-> (KidProfile).
     Unique constraint prevents duplicate links.
     """
-    parent = models.ForeignKey("users.User", on_delete=models.CASCADE, related_name="parent_links")
-    kid = models.ForeignKey("users.KidProfile", on_delete=models.CASCADE, related_name="parent_links")
+
+    parent = models.ForeignKey(
+        "users.User", on_delete=models.CASCADE, related_name="parent_links"
+    )
+    kid = models.ForeignKey(
+        "users.KidProfile", on_delete=models.CASCADE, related_name="parent_links"
+    )
     relationship = models.CharField(max_length=64, blank=True, null=True)
     is_primary = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -99,4 +123,3 @@ class ParentChildLink(models.Model):
 
     def __str__(self):
         return f"ParentChildLink parent={self.parent_id} kid={self.kid_id}"
-
