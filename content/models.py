@@ -90,7 +90,9 @@ class Question(models.Model):
         "content.Quiz", on_delete=models.CASCADE, related_name="questions"
     )
     question_text = models.TextField()
-    question_type = models.CharField(max_length=16, choices=QUESTION_TYPE_CHOICES, default="mcq")
+    question_type = models.CharField(
+        max_length=16, choices=QUESTION_TYPE_CHOICES, default="mcq"
+    )
     metadata = models.JSONField(default=dict, blank=True)  # images, hints, timers, etc.
 
     def __str__(self):
