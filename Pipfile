@@ -9,6 +9,7 @@ django-debug-toolbar = "*"
 black = "*"
 isort = "*"
 flake8 = "*"
+pytest = "*"
 
 [dev-packages]
 
