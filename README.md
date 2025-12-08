@@ -1,4 +1,4 @@
 # Backend
-this repo belongs to backend tasks andrelated controlling
-# my name is matyos tsegay...........
+this repo belongs to backend tasks and related controlling
+
 
