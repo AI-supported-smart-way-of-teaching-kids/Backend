@@ -17,3 +17,15 @@ black
 # Add any other libraries your backend uses:
 # requests
 # python-dotenv
+
+Django>=4.2
+djangorestframework
+psycopg[binary]              # postgres driver (or mysqlclient for MySQL)
+django-environ               # env vars
+django-cors-headers
+django-storages[boto3]       # for S3 media
+boto3
+celery[redis]
+redis
+gunicorn
+pytest-django                # for testing
