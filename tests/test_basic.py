@@ -1,2 +1,3 @@
 def test_basic_pass():
-    assert 1 == 1
+    if 1 != 1:
+        raise AssertionError("Expected 1 to equal 1")

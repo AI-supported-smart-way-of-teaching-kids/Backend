@@ -38,11 +38,13 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "debug_toolbar",
+    "ai.apps.AiConfig",
+    "lessons.apps.LessonsConfig",
     "core.apps.CoreConfig",
-    "users.apps.UsersConfig",
-    "content.apps.ContentConfig",
-    "learning.apps.LearningConfig",
-    "analytics.apps.AnalyticsConfig",
+    "profiles.apps.ProfilesConfig",
+    "progress.apps.ProgressConfig",
+    "quizzes.apps.QuizzesConfig",
+    "playground.apps.PlaygroundConfig",
 ]
 
 MIDDLEWARE = [
@@ -59,6 +61,8 @@ MIDDLEWARE = [
 INTERNAL_IPS = [
     "127.0.0.1",
 ]
+
+AUTH_USER_MODEL = "profiles.User"
 
 ROOT_URLCONF = "kids_App.urls"
 
