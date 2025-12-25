@@ -69,7 +69,7 @@ class QuizAttempt(models.Model):
     """Child's attempt (append-only)"""
 
     child = models.ForeignKey(
-        'profiles.ChildProfile',
+        "profiles.ChildProfile",
         on_delete=models.PROTECT,
         related_name="quiz_attempts",
         help_text="Child who attempted the quiz",

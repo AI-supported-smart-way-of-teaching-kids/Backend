@@ -64,7 +64,7 @@ class BaseInteractionModel(models.Model):
         max_length=36, null=True, blank=True, help_text="UUID from accounts.User"
     )
     child = models.ForeignKey(
-        'profiles.ChildProfile',
+        "profiles.ChildProfile",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
