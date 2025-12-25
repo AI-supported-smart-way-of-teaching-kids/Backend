@@ -1,10 +1,7 @@
 from decimal import Decimal
-
 from django.core.validators import MinValueValidator
 from django.db import models
-
 from lessons.models import lesson
-
 
 
 class Quiz(models.Model):
