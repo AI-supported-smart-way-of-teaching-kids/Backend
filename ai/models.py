@@ -20,27 +20,13 @@ from profiles.models import ChildProfile
 
 class MLModel(models.Model):
     """Metadata for AI model versions
-               and artifact locations."""
+    and artifact locations."""
 
-    name = models.CharField(
-        max_length=100,
-        help_text="Model name"
-    )
-    version = models.CharField(
-        max_length=50,
-        help_text="Model version"
-    )
-    file_path = models.CharField(
-        max_length=500,
-        help_text="Artifact location"
-    )
-    metadata = models.JSONField(
-        null=True,
-        blank=True,
-        help_text="Model metadata")
-    created_at = models.DateTimeField(
-        auto_now_add=True
-    )
+    name = models.CharField(max_length=100, help_text="Model name")
+    version = models.CharField(max_length=50, help_text="Model version")
+    file_path = models.CharField(max_length=500, help_text="Artifact location")
+    metadata = models.JSONField(null=True, blank=True, help_text="Model metadata")
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = "ml_mlmodel"
@@ -63,8 +49,7 @@ class MLStudentMap(models.Model):
     """Bridge table mapping ML internal IDs to backend ChildProfiles."""
 
     ml_student_id = models.IntegerField(
-        primary_key=True,
-        help_text="ML team's internal student ID"
+        primary_key=True, help_text="ML team's internal student ID"
     )
     student_uuid = models.UUIDField(
         null=True,
@@ -122,14 +107,9 @@ class MLStudentMap(models.Model):
 class BaseInteractionModel(models.Model):
     """Abstract base to keep shared ML fields consistent."""
 
-    ml_student_id = models.IntegerField(
-        help_text="ML team's internal student ID"
-    )
+    ml_student_id = models.IntegerField(help_text="ML team's internal student ID")
     student_uuid = models.CharField(
-        max_length=36,
-        null=True,
-        blank=True,
-        help_text="UUID from accounts.User"
+        max_length=36, null=True, blank=True, help_text="UUID from accounts.User"
     )
     child = models.ForeignKey(
         ChildProfile,
@@ -147,25 +127,15 @@ class BaseInteractionModel(models.Model):
 class LessonInteractionsRaw(BaseInteractionModel):
     """Append-only raw interaction events."""
 
-    lesson_id = models.IntegerField(
-        help_text="Lesson ID from lessons_lesson table"
-    )
-    time_spent = models.FloatField(
-        help_text="Time spent on lesson (minutes)"
-    )
+    lesson_id = models.IntegerField(help_text="Lesson ID from lessons_lesson table")
+    time_spent = models.FloatField(help_text="Time spent on lesson (minutes)")
     video_watch_percentage = models.FloatField(
         validators=[MinValueValidator(0), MaxValueValidator(150)],
         help_text="Raw video watch percentage (0-150)",
     )
-    number_of_clicks = models.IntegerField(
-        help_text="Number of clicks/interactions"
-    )
-    completion_status = models.BooleanField(
-        help_text="Whether lesson was completed"
-    )
-    received_at = models.DateTimeField(
-        auto_now_add=True
-    )
+    number_of_clicks = models.IntegerField(help_text="Number of clicks/interactions")
+    completion_status = models.BooleanField(help_text="Whether lesson was completed")
+    received_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = "ml_lesson_interactions_raw"
@@ -186,24 +156,14 @@ class LessonInteractionsRaw(BaseInteractionModel):
 class QuizAttemptsRaw(BaseInteractionModel):
     """Unprocessed quiz scores and behaviors."""
 
-    lesson_id = models.IntegerField(
-        help_text="Lesson ID linked to this quiz"
-    )
+    lesson_id = models.IntegerField(help_text="Lesson ID linked to this quiz")
     attempt_number = models.IntegerField(
         help_text="Ordinal attempt count (1st, 2nd, etc.)"
     )
-    score = models.FloatField(
-        help_text="Raw numerical score achieved"
-    )
-    wrong_questions = models.IntegerField(
-        help_text="Count of incorrect answers"
-    )
-    response_time = models.FloatField(
-        help_text="Total time taken in seconds"
-    )
-    received_at = models.DateTimeField(
-        auto_now_add=True
-    )
+    score = models.FloatField(help_text="Raw numerical score achieved")
+    wrong_questions = models.IntegerField(help_text="Count of incorrect answers")
+    response_time = models.FloatField(help_text="Total time taken in seconds")
+    received_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = "ml_quiz_attempts_raw"
@@ -230,12 +190,8 @@ class ProgressRaw(BaseInteractionModel):
     badges_earned = models.IntegerField(
         help_text="Total badges unlocked recorded today"
     )
-    streak_days = models.IntegerField(
-        help_text="Current login streak in days"
-    )
-    topic_mastery = models.FloatField(
-        help_text="Raw mastery score (unclipped)"
-    )
+    streak_days = models.IntegerField(help_text="Current login streak in days")
+    topic_mastery = models.FloatField(help_text="Raw mastery score (unclipped)")
     received_at = models.DateTimeField(
         auto_now_add=True, help_text="Timestamp of log entry"
     )
@@ -263,9 +219,7 @@ class ProgressRaw(BaseInteractionModel):
 class LessonInteractionsClean(BaseInteractionModel):
     """Clipped and normalized lesson data for ML training."""
 
-    lesson_id = models.IntegerField(
-        help_text="Lesson ID from lessons_lesson table"
-    )
+    lesson_id = models.IntegerField(help_text="Lesson ID from lessons_lesson table")
     time_spent = models.FloatField(
         validators=[MinValueValidator(1), MaxValueValidator(30)],
         help_text="Clipped time spent (1-30 minutes)",
@@ -275,15 +229,10 @@ class LessonInteractionsClean(BaseInteractionModel):
         help_text="Clipped watch percentage (0-100)",
     )
     number_of_clicks = models.IntegerField(
-        validators=[MinValueValidator(0)],
-        help_text="Number of clicks (>=0)"
+        validators=[MinValueValidator(0)], help_text="Number of clicks (>=0)"
     )
-    completion_status = models.BooleanField(
-        help_text="Completion status"
-    )
-    cleaned_at = models.DateTimeField(
-        auto_now_add=True
-    )
+    completion_status = models.BooleanField(help_text="Completion status")
+    cleaned_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = "ml_lesson_interactions_clean"
@@ -305,9 +254,7 @@ class QuizAttemptsClean(BaseInteractionModel):
     Sanitized quiz attempts with physiological and logical limits applied.
     """
 
-    lesson_id = models.IntegerField(
-        help_text="Lesson ID from lessons_lesson table"
-    )
+    lesson_id = models.IntegerField(help_text="Lesson ID from lessons_lesson table")
     attempt_number = models.IntegerField(
         validators=[MinValueValidator(1), MaxValueValidator(3)],
         help_text="Attempt count clipped (max 3 for statistical use)",
@@ -325,8 +272,7 @@ class QuizAttemptsClean(BaseInteractionModel):
         help_text="Response time clipped (5s to 150s)",
     )
     cleaned_at = models.DateTimeField(
-        auto_now_add=True,
-        help_text="Timestamp of sanitization"
+        auto_now_add=True, help_text="Timestamp of sanitization"
     )
 
     class Meta:
@@ -392,9 +338,7 @@ class LessonFeatures(BaseInteractionModel):
     avg_video_watch = models.FloatField(
         help_text="Average video watch percentage (0-100)"
     )
-    avg_clicks = models.FloatField(
-        help_text="Average number of clicks per lesson"
-    )
+    avg_clicks = models.FloatField(help_text="Average number of clicks per lesson")
     completion_rate = models.FloatField(
         validators=[MinValueValidator(0), MaxValueValidator(1)],
         help_text="Lesson completion rate (0-1)",
@@ -425,12 +369,8 @@ class QuizFeatures(BaseInteractionModel):
     avg_response_time = models.FloatField(
         help_text="Average response time per question (seconds)"
     )
-    avg_attempt_number = models.FloatField(
-        help_text="Average attempt number per quiz"
-    )
-    computed_at = models.DateTimeField(
-        auto_now_add=True
-    )
+    avg_attempt_number = models.FloatField(help_text="Average attempt number per quiz")
+    computed_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = "ml_quiz_features"
@@ -453,26 +393,16 @@ class ProgressLabeled(BaseInteractionModel):
         MEDIUM = "Medium", "Medium"
         HIGH = "High", "High"
 
-    lessons_completed = models.IntegerField(
-        help_text="Number of lessons completed"
-    )
-    badges_earned = models.IntegerField(
-        help_text="Number of badges earned"
-    )
-    streak_days = models.IntegerField(
-        help_text="Current streak in days"
-    )
-    topic_mastery = models.FloatField(
-        help_text="Topic mastery score (0-100)"
-    )
+    lessons_completed = models.IntegerField(help_text="Number of lessons completed")
+    badges_earned = models.IntegerField(help_text="Number of badges earned")
+    streak_days = models.IntegerField(help_text="Current streak in days")
+    topic_mastery = models.FloatField(help_text="Topic mastery score (0-100)")
     mastery_level = models.CharField(
         max_length=10,
         choices=MasteryLevel.choices,
         help_text="Mastery level classification",
     )
-    computed_at = models.DateTimeField(
-        auto_now_add=True
-    )
+    computed_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = "ml_progress_labeled"
@@ -509,51 +439,32 @@ class StudentMLDataset(models.Model):
     avg_video_watch = models.FloatField(
         help_text="Average video watch percentage (0-100)"
     )
-    avg_clicks = models.FloatField(
-        help_text="Average number of clicks per lesson"
-    )
-    completion_rate = models.FloatField(
-        help_text="Lesson completion rate (0-1)"
-    )
+    avg_clicks = models.FloatField(help_text="Average number of clicks per lesson")
+    completion_rate = models.FloatField(help_text="Lesson completion rate (0-1)")
 
     # Quiz features (4)
-    avg_score = models.FloatField(
-        help_text="Average quiz score (0-100)"
-    )
+    avg_score = models.FloatField(help_text="Average quiz score (0-100)")
     avg_wrong_questions = models.FloatField(
         help_text="Average wrong questions per quiz"
     )
     avg_response_time = models.FloatField(
         help_text="Average response time per question (seconds)"
     )
-    avg_attempt_number = models.FloatField(
-        help_text="Average attempt number per quiz"
-    )
+    avg_attempt_number = models.FloatField(help_text="Average attempt number per quiz")
 
     # Progress features (3)
-    lessons_completed = models.IntegerField(
-        help_text="Number of lessons completed"
-    )
-    badges_earned = models.IntegerField(
-        help_text="Number of badges earned"
-    )
-    streak_days = models.IntegerField(
-        help_text="Current streak in days"
-    )
-    topic_mastery = models.FloatField(
-        help_text="Topic mastery score (0-100)"
-    )
+    lessons_completed = models.IntegerField(help_text="Number of lessons completed")
+    badges_earned = models.IntegerField(help_text="Number of badges earned")
+    streak_days = models.IntegerField(help_text="Current streak in days")
+    topic_mastery = models.FloatField(help_text="Topic mastery score (0-100)")
 
     # Target (1)
     MASTERY_LEVEL_CHOICES = [("Low", "Low"), ("Medium", "Medium"), ("High", "High")]
     mastery_level = models.CharField(
-        max_length=10,
-        choices=MASTERY_LEVEL_CHOICES,
-        help_text="Target classification"
+        max_length=10, choices=MASTERY_LEVEL_CHOICES, help_text="Target classification"
     )
     snapshot_date = models.DateField(
-        auto_now_add=True,
-        help_text="Date of snapshot creation"
+        auto_now_add=True, help_text="Date of snapshot creation"
     )
 
     class Meta:
