@@ -6,7 +6,7 @@ from profiles.models import TeacherProfile
 
 
 # Create your models here.
-class lesson(models.Model):
+class Lesson(models.Model):
     """Lesson metadata & media URL"""
 
     class Difficulty(models.TextChoices):
@@ -56,6 +56,7 @@ class lesson(models.Model):
             models.Index(fields=["is_published", "created_at"]),
         ]
         ordering = ["-created_at"]
+        # ordering = ["title"]
 
     def save(self, *args, **kwargs):
         if not self.slug:

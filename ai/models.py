@@ -1,18 +1,46 @@
+"""
+Machine Learning Pipeline Models for Educational Platform.
+
+This module implements a complete ETL pipeline for ML-driven educational
+recommendations. Follows PEP8 standards with consistent stacked structure.
+"""
+
+import uuid
+
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
-from lessons.models import lesson
 from profiles.models import ChildProfile
 
 
-class MLModel(models.Model):
-    """Model metadata"""
+# ==============================================================================
+# 1. SYSTEM CONFIGURATION & MAPPING
+# ==============================================================================
 
-    name = models.CharField(max_length=100, help_text="Model name")
-    version = models.CharField(max_length=50, help_text="Model version")
-    file_path = models.CharField(max_length=500, help_text="Artifact location")
-    metadata = models.JSONField(null=True, blank=True, help_text="Model metadata")
-    created_at = models.DateTimeField(auto_now_add=True)
+
+class MLModel(models.Model):
+    """Metadata for AI model versions
+               and artifact locations."""
+
+    name = models.CharField(
+        max_length=100,
+        help_text="Model name"
+    )
+    version = models.CharField(
+        max_length=50,
+        help_text="Model version"
+    )
+    file_path = models.CharField(
+        max_length=500,
+        help_text="Artifact location"
+    )
+    metadata = models.JSONField(
+        null=True,
+        blank=True,
+        help_text="Model metadata")
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
 
     class Meta:
         db_table = "ml_mlmodel"
@@ -21,19 +49,28 @@ class MLModel(models.Model):
                 fields=["name", "version"], name="unique_model_version"
             )
         ]
+        indexes = [
+            models.Index(fields=["name", "version"]),
+            models.Index(fields=["created_at"]),
+        ]
 
     def __str__(self):
+        """String representation of the model."""
         return f"{self.name} v{self.version}"
 
 
 class MLStudentMap(models.Model):
-    """Map ML ID → backend child"""
+    """Bridge table mapping ML internal IDs to backend ChildProfiles."""
 
     ml_student_id = models.IntegerField(
-        primary_key=True, help_text="ML team's internal student ID"
+        primary_key=True,
+        help_text="ML team's internal student ID"
     )
-    student_uuid = models.CharField(
-        max_length=36, null=True, blank=True, help_text="UUID from accounts.User"
+    student_uuid = models.UUIDField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="UUID from User model (accounts.User.uuid)",
     )
     child = models.ForeignKey(
         ChildProfile,
@@ -50,21 +87,52 @@ class MLStudentMap(models.Model):
         indexes = [
             models.Index(fields=["student_uuid"]),
             models.Index(fields=["child"]),
+            models.Index(fields=["mapped_at"]),
         ]
 
+    def save(self, *args, **kwargs):
+        """Populate student_uuid from related User or generate a new one."""
+        if not self.student_uuid:
+            # Prefer the ChildProfile's user.uuid if it exists
+            if self.child and getattr(self.child, "user", None):
+                user_uuid = getattr(self.child.user, "uuid", None)
+                if user_uuid:
+                    # Accepts either a UUID object or a string
+                    self.student_uuid = user_uuid
+                else:
+                    # child.user exists but doesn't have uuid attribute
+                    self.student_uuid = uuid.uuid4()
+            else:
+                # No child/user — generate an ML-side UUID
+                self.student_uuid = uuid.uuid4()
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f"ML{self.ml_student_id} -> {self.child.user.username if self.child else 'No mapping'}"
+        """String representation of the mapping."""
+        if self.child and hasattr(self.child, "user"):
+            return f"ML{self.ml_student_id} -> {self.child.user.username}"
+        return f"ML{self.ml_student_id} -> No mapping"
+
+
+# ==============================================================================
+# 2. DATA PIPELINE (RAW EVENTS)
+# ==============================================================================
 
 
 class BaseInteractionModel(models.Model):
-    """Base model for ML interaction data"""
+    """Abstract base to keep shared ML fields consistent."""
 
-    ml_student_id = models.IntegerField(help_text="ML team's internal student ID")
+    ml_student_id = models.IntegerField(
+        help_text="ML team's internal student ID"
+    )
     student_uuid = models.CharField(
-        max_length=36, null=True, blank=True, help_text="UUID from accounts.User"
+        max_length=36,
+        null=True,
+        blank=True,
+        help_text="UUID from accounts.User"
     )
     child = models.ForeignKey(
-        "profiles.ChildProfile",
+        ChildProfile,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -77,72 +145,127 @@ class BaseInteractionModel(models.Model):
 
 
 class LessonInteractionsRaw(BaseInteractionModel):
-    """Append-only raw events"""
+    """Append-only raw interaction events."""
 
-    lesson_id = models.IntegerField(help_text="Lesson ID from lessons_lesson")
-    time_spent = models.FloatField(help_text="Time spent on lesson (minutes)")
+    lesson_id = models.IntegerField(
+        help_text="Lesson ID from lessons_lesson table"
+    )
+    time_spent = models.FloatField(
+        help_text="Time spent on lesson (minutes)"
+    )
     video_watch_percentage = models.FloatField(
         validators=[MinValueValidator(0), MaxValueValidator(150)],
         help_text="Raw video watch percentage (0-150)",
     )
-    number_of_clicks = models.IntegerField(help_text="Number of clicks/interactions")
-    completion_status = models.BooleanField(help_text="Whether lesson was completed")
-    received_at = models.DateTimeField(auto_now_add=True)
+    number_of_clicks = models.IntegerField(
+        help_text="Number of clicks/interactions"
+    )
+    completion_status = models.BooleanField(
+        help_text="Whether lesson was completed"
+    )
+    received_at = models.DateTimeField(
+        auto_now_add=True
+    )
 
     class Meta:
         db_table = "ml_lesson_interactions_raw"
         indexes = [
             models.Index(fields=["ml_student_id", "received_at"]),
-            models.Index(fields=["student_uuid", "received_at"]),
+            models.Index(fields=["lesson_id", "received_at"]),
+            models.Index(fields=["received_at"]),
         ]
 
     def __str__(self):
-        return f"Lesson {self.lesson_id} - Student {self.ml_student_id}"
+        """String representation of raw lesson interactions."""
+        return (
+            f"LessonInteractionsRaw {self.id}: "
+            f"ML{self.ml_student_id} - Lesson {self.lesson_id}"
+        )
 
 
 class QuizAttemptsRaw(BaseInteractionModel):
-    """Raw quiz rows"""
+    """Unprocessed quiz scores and behaviors."""
 
-    lesson_id = models.IntegerField(help_text="Lesson ID from lessons_lesson")
-    attempt_number = models.IntegerField(help_text="Attempt number (1, 2, 3...)")
-    score = models.FloatField(help_text="Raw score")
-    wrong_questions = models.IntegerField(help_text="Number of wrong questions")
-    response_time = models.FloatField(help_text="Response time in seconds")
-    received_at = models.DateTimeField(auto_now_add=True)
+    lesson_id = models.IntegerField(
+        help_text="Lesson ID linked to this quiz"
+    )
+    attempt_number = models.IntegerField(
+        help_text="Ordinal attempt count (1st, 2nd, etc.)"
+    )
+    score = models.FloatField(
+        help_text="Raw numerical score achieved"
+    )
+    wrong_questions = models.IntegerField(
+        help_text="Count of incorrect answers"
+    )
+    response_time = models.FloatField(
+        help_text="Total time taken in seconds"
+    )
+    received_at = models.DateTimeField(
+        auto_now_add=True
+    )
 
     class Meta:
         db_table = "ml_quiz_attempts_raw"
         indexes = [
             models.Index(fields=["ml_student_id", "lesson_id"]),
+            models.Index(fields=["received_at"]),
+            models.Index(fields=["lesson_id", "attempt_number"]),
         ]
 
     def __str__(self):
-        return f"Quiz {self.lesson_id} - Attempt {self.attempt_number}"
+        """String representation of raw quiz attempts."""
+        return (
+            f"QuizAttemptsRaw {self.id}: "
+            f"ML{self.ml_student_id} - Attempt {self.attempt_number}"
+        )
 
 
 class ProgressRaw(BaseInteractionModel):
-    """Raw progress summary"""
+    """Daily snapshots of a student's standing before sanitization."""
 
-    lessons_completed = models.IntegerField(help_text="Number of lessons completed")
-    badges_earned = models.IntegerField(help_text="Number of badges earned")
-    streak_days = models.IntegerField(help_text="Current streak in days")
-    topic_mastery = models.FloatField(
-        validators=[MinValueValidator(-5), MaxValueValidator(110)],
-        help_text="Raw topic mastery (-5 to 110)",
+    lessons_completed = models.IntegerField(
+        help_text="Total lessons finished recorded today"
     )
-    received_at = models.DateTimeField(auto_now_add=True)
+    badges_earned = models.IntegerField(
+        help_text="Total badges unlocked recorded today"
+    )
+    streak_days = models.IntegerField(
+        help_text="Current login streak in days"
+    )
+    topic_mastery = models.FloatField(
+        help_text="Raw mastery score (unclipped)"
+    )
+    received_at = models.DateTimeField(
+        auto_now_add=True, help_text="Timestamp of log entry"
+    )
 
     class Meta:
         db_table = "ml_progress_raw"
+        indexes = [
+            models.Index(fields=["ml_student_id", "received_at"]),
+            models.Index(fields=["received_at"]),
+        ]
 
     def __str__(self):
-        return f"Progress Raw - Student {self.ml_student_id}"
+        """String representation of raw progress."""
+        return (
+            f"ProgressRaw {self.id}: "
+            f"ML{self.ml_student_id} - {self.received_at.date()}"
+        )
+
+
+# ==============================================================================
+# 3. DATA PIPELINE (CLEANED & AGGREGATED)
+# ==============================================================================
 
 
 class LessonInteractionsClean(BaseInteractionModel):
-    """Cleaned & clipped lesson interactions"""
+    """Clipped and normalized lesson data for ML training."""
 
-    lesson_id = models.IntegerField(help_text="Lesson ID from lessons_lesson")
+    lesson_id = models.IntegerField(
+        help_text="Lesson ID from lessons_lesson table"
+    )
     time_spent = models.FloatField(
         validators=[MinValueValidator(1), MaxValueValidator(30)],
         help_text="Clipped time spent (1-30 minutes)",
@@ -152,246 +275,325 @@ class LessonInteractionsClean(BaseInteractionModel):
         help_text="Clipped watch percentage (0-100)",
     )
     number_of_clicks = models.IntegerField(
-        validators=[MinValueValidator(0)], help_text="Number of clicks (>=0)"
+        validators=[MinValueValidator(0)],
+        help_text="Number of clicks (>=0)"
     )
-    completion_status = models.BooleanField(help_text="Whether lesson was completed")
-    cleaned_at = models.DateTimeField(auto_now_add=True)
+    completion_status = models.BooleanField(
+        help_text="Completion status"
+    )
+    cleaned_at = models.DateTimeField(
+        auto_now_add=True
+    )
 
     class Meta:
         db_table = "ml_lesson_interactions_clean"
         indexes = [
             models.Index(fields=["child", "lesson_id"]),
+            models.Index(fields=["cleaned_at"]),
         ]
 
     def __str__(self):
-        return f"Clean Lesson {self.lesson_id} - Student {self.ml_student_id}"
+        """String representation of cleaned lesson interactions."""
+        return (
+            f"LessonInteractionsClean {self.id}: "
+            f"ML{self.ml_student_id} - Lesson {self.lesson_id}"
+        )
 
 
 class QuizAttemptsClean(BaseInteractionModel):
-    """Cleaned quiz data"""
+    """
+    Sanitized quiz attempts with physiological and logical limits applied.
+    """
 
-    lesson_id = models.IntegerField(help_text="Lesson ID from lessons_lesson")
+    lesson_id = models.IntegerField(
+        help_text="Lesson ID from lessons_lesson table"
+    )
     attempt_number = models.IntegerField(
         validators=[MinValueValidator(1), MaxValueValidator(3)],
-        help_text="Attempt number (1-3)",
+        help_text="Attempt count clipped (max 3 for statistical use)",
     )
     score = models.FloatField(
         validators=[MinValueValidator(0), MaxValueValidator(100)],
-        help_text="Score (0-100)",
+        help_text="Score normalized to 0-100 range",
     )
     wrong_questions = models.IntegerField(
         validators=[MinValueValidator(0), MaxValueValidator(4)],
-        help_text="Wrong questions (0-4)",
+        help_text="Validated count (0-4)",
     )
     response_time = models.FloatField(
         validators=[MinValueValidator(5), MaxValueValidator(150)],
-        help_text="Response time (5-150 seconds)",
+        help_text="Response time clipped (5s to 150s)",
     )
-    cleaned_at = models.DateTimeField(auto_now_add=True)
+    cleaned_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text="Timestamp of sanitization"
+    )
 
     class Meta:
         db_table = "ml_quiz_attempts_clean"
+        indexes = [
+            models.Index(fields=["child", "lesson_id"]),
+            models.Index(fields=["cleaned_at"]),
+        ]
 
     def __str__(self):
-        return f"Clean Quiz {self.lesson_id} - Attempt {self.attempt_number}"
+        """String representation of cleaned quiz attempts."""
+        return (
+            f"QuizAttemptsClean {self.id}: "
+            f"ML{self.ml_student_id} - Lesson {self.lesson_id}"
+        )
 
 
-class ProgressClean(models.Model):
-    """Cleaned progress per student"""
+class ProgressClean(BaseInteractionModel):
+    """Sanitized progress metrics clipped to realistic limits."""
 
-    ml_student_id = models.IntegerField(
-        primary_key=True, help_text="ML team's internal student ID"
-    )
-    child = models.ForeignKey(
-        ChildProfile,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="progress_clean",
-        help_text="Django ChildProfile reference",
-    )
     lessons_completed = models.IntegerField(
-        validators=[MinValueValidator(0)], help_text="Lessons completed (>=0)"
+        validators=[MinValueValidator(0)],
+        help_text="Validated non-negative lesson count",
     )
     badges_earned = models.IntegerField(
         validators=[MinValueValidator(0), MaxValueValidator(12)],
-        help_text="Badges earned (0-12)",
+        help_text="Badges clipped to max system limit (0-12)",
     )
     streak_days = models.IntegerField(
         validators=[MinValueValidator(0), MaxValueValidator(50)],
-        help_text="Streak days (0-50)",
+        help_text="Streak clipped to a yearly limit (0-50)",
     )
     topic_mastery = models.FloatField(
         validators=[MinValueValidator(0), MaxValueValidator(100)],
-        help_text="Topic mastery (0-100)",
+        help_text="Mastery score normalized (0-100%)",
     )
-    cleaned_at = models.DateTimeField(auto_now_add=True)
+    cleaned_at = models.DateTimeField(
+        auto_now_add=True, help_text="When the raw data was sanitized"
+    )
 
     class Meta:
         db_table = "ml_progress_clean"
+        indexes = [
+            models.Index(fields=["cleaned_at"]),
+        ]
 
     def __str__(self):
-        return f"Clean Progress - Student {self.ml_student_id}"
+        """String representation of cleaned progress."""
+        return f"ProgressClean {self.id}: ML{self.ml_student_id}"
 
 
-class LessonFeatures(models.Model):
-    """Aggregated lesson features per student"""
+# ==============================================================================
+# 4. FEATURE TABLES (AGGREGATED)
+# ==============================================================================
 
-    student_id = models.IntegerField(help_text="ML team's internal student ID")
-    child = models.ForeignKey(
-        ChildProfile,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="lesson_features",
-        help_text="Django ChildProfile reference",
+
+class LessonFeatures(BaseInteractionModel):
+    """Aggregated lesson features per student."""
+
+    avg_time_spent = models.FloatField(
+        help_text="Average time spent per lesson (minutes)"
     )
-    avg_time_spent = models.FloatField(help_text="Average time spent per lesson")
-    avg_video_watch = models.FloatField(help_text="Average video watch percentage")
-    avg_clicks = models.FloatField(help_text="Average number of clicks per lesson")
-    completion_rate = models.FloatField(help_text="Lesson completion rate")
+    avg_video_watch = models.FloatField(
+        help_text="Average video watch percentage (0-100)"
+    )
+    avg_clicks = models.FloatField(
+        help_text="Average number of clicks per lesson"
+    )
+    completion_rate = models.FloatField(
+        validators=[MinValueValidator(0), MaxValueValidator(1)],
+        help_text="Lesson completion rate (0-1)",
+    )
     computed_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = "ml_lesson_features"
+        indexes = [
+            models.Index(fields=["computed_at"]),
+        ]
 
     def __str__(self):
-        return f"Lesson Features - Student {self.student_id}"
+        """String representation of lesson features."""
+        return f"LessonFeatures {self.id}: ML{self.ml_student_id}"
 
 
-class QuizFeatures(models.Model):
-    """Aggregated quiz features per student"""
+class QuizFeatures(BaseInteractionModel):
+    """Aggregated quiz features per student."""
 
-    student_id = models.IntegerField(help_text="ML team's internal student ID")
-    child = models.ForeignKey(
-        ChildProfile,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="quiz_features",
-        help_text="Django ChildProfile reference",
+    avg_score = models.FloatField(
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        help_text="Average quiz score (0-100)",
     )
-    avg_score = models.FloatField(help_text="Average quiz score")
-    avg_wrong_questions = models.FloatField(help_text="Average wrong questions")
-    avg_response_time = models.FloatField(help_text="Average response time")
-    avg_attempt_number = models.FloatField(help_text="Average attempt number")
-    computed_at = models.DateTimeField(auto_now_add=True)
+    avg_wrong_questions = models.FloatField(
+        help_text="Average wrong questions per quiz"
+    )
+    avg_response_time = models.FloatField(
+        help_text="Average response time per question (seconds)"
+    )
+    avg_attempt_number = models.FloatField(
+        help_text="Average attempt number per quiz"
+    )
+    computed_at = models.DateTimeField(
+        auto_now_add=True
+    )
 
     class Meta:
         db_table = "ml_quiz_features"
+        indexes = [
+            models.Index(fields=["computed_at"]),
+        ]
 
     def __str__(self):
-        return f"Quiz Features - Student {self.student_id}"
+        """String representation of quiz features."""
+        return f"QuizFeatures {self.id}: ML{self.ml_student_id}"
 
 
-class ProgressLabeled(models.Model):
-    """Labeled progress (target)"""
+class ProgressLabeled(BaseInteractionModel):
+    """Labeled progress (target)."""
 
     class MasteryLevel(models.TextChoices):
+        """Mastery level choices."""
+
         LOW = "Low", "Low"
         MEDIUM = "Medium", "Medium"
         HIGH = "High", "High"
 
-    student_id = models.IntegerField(help_text="ML team's internal student ID")
-    child = models.ForeignKey(
-        ChildProfile,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="progress_labeled",
-        help_text="Django ChildProfile reference",
+    lessons_completed = models.IntegerField(
+        help_text="Number of lessons completed"
     )
-    lessons_completed = models.IntegerField(help_text="Number of lessons completed")
-    badges_earned = models.IntegerField(help_text="Number of badges earned")
-    streak_days = models.IntegerField(help_text="Current streak in days")
-    topic_mastery = models.FloatField(help_text="Topic mastery score")
+    badges_earned = models.IntegerField(
+        help_text="Number of badges earned"
+    )
+    streak_days = models.IntegerField(
+        help_text="Current streak in days"
+    )
+    topic_mastery = models.FloatField(
+        help_text="Topic mastery score (0-100)"
+    )
     mastery_level = models.CharField(
         max_length=10,
         choices=MasteryLevel.choices,
         help_text="Mastery level classification",
     )
-    computed_at = models.DateTimeField(auto_now_add=True)
+    computed_at = models.DateTimeField(
+        auto_now_add=True
+    )
 
     class Meta:
         db_table = "ml_progress_labeled"
+        indexes = [
+            models.Index(fields=["mastery_level", "computed_at"]),
+        ]
 
     def __str__(self):
-        return f"Progress Labeled - Student {self.student_id} ({self.mastery_level})"
+        """String representation of labeled progress."""
+        return (
+            f"ProgressLabeled {self.id}: "
+            f"ML{self.ml_student_id} ({self.mastery_level})"
+        )
 
 
 class StudentMLDataset(models.Model):
-    """Final merged ML dataset"""
+    """Final merged ML dataset for training."""
 
     student_id = models.IntegerField(
-        primary_key=True, help_text="ML team's internal student ID"
+        primary_key=True, help_text="ML Internal Student ID"
     )
     child = models.ForeignKey(
         ChildProfile,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="ml_dataset",
-        help_text="Django ChildProfile reference",
+        help_text="Backend Child Reference",
     )
 
-    # Lesson features
-    avg_time_spent = models.FloatField(help_text="Average time spent per lesson")
-    avg_video_watch = models.FloatField(help_text="Average video watch percentage")
-    avg_clicks = models.FloatField(help_text="Average number of clicks per lesson")
-    completion_rate = models.FloatField(help_text="Lesson completion rate")
+    # Lesson features (4)
+    avg_time_spent = models.FloatField(
+        help_text="Average time spent per lesson (minutes)"
+    )
+    avg_video_watch = models.FloatField(
+        help_text="Average video watch percentage (0-100)"
+    )
+    avg_clicks = models.FloatField(
+        help_text="Average number of clicks per lesson"
+    )
+    completion_rate = models.FloatField(
+        help_text="Lesson completion rate (0-1)"
+    )
 
-    # Quiz features
-    avg_score = models.FloatField(help_text="Average quiz score")
-    avg_wrong_questions = models.FloatField(help_text="Average wrong questions")
-    avg_response_time = models.FloatField(help_text="Average response time")
-    avg_attempt_number = models.FloatField(help_text="Average attempt number")
+    # Quiz features (4)
+    avg_score = models.FloatField(
+        help_text="Average quiz score (0-100)"
+    )
+    avg_wrong_questions = models.FloatField(
+        help_text="Average wrong questions per quiz"
+    )
+    avg_response_time = models.FloatField(
+        help_text="Average response time per question (seconds)"
+    )
+    avg_attempt_number = models.FloatField(
+        help_text="Average attempt number per quiz"
+    )
 
-    # Progress features
-    lessons_completed = models.IntegerField(help_text="Number of lessons completed")
-    badges_earned = models.IntegerField(help_text="Number of badges earned")
-    streak_days = models.IntegerField(help_text="Current streak in days")
-    topic_mastery = models.FloatField(help_text="Topic mastery score")
+    # Progress features (3)
+    lessons_completed = models.IntegerField(
+        help_text="Number of lessons completed"
+    )
+    badges_earned = models.IntegerField(
+        help_text="Number of badges earned"
+    )
+    streak_days = models.IntegerField(
+        help_text="Current streak in days"
+    )
+    topic_mastery = models.FloatField(
+        help_text="Topic mastery score (0-100)"
+    )
 
-    # Target
+    # Target (1)
+    MASTERY_LEVEL_CHOICES = [("Low", "Low"), ("Medium", "Medium"), ("High", "High")]
     mastery_level = models.CharField(
         max_length=10,
-        choices=ProgressLabeled.MasteryLevel.choices,
-        help_text="Mastery level classification",
+        choices=MASTERY_LEVEL_CHOICES,
+        help_text="Target classification"
     )
-
-    snapshot_date = models.DateField(help_text="Date of data snapshot")
+    snapshot_date = models.DateField(
+        auto_now_add=True,
+        help_text="Date of snapshot creation"
+    )
 
     class Meta:
         db_table = "ml_student_ml_dataset"
         indexes = [
-            models.Index(fields=["snapshot_date", "mastery_level"]),
+            models.Index(fields=["snapshot_date"]),
+            models.Index(fields=["mastery_level"]),
         ]
 
     def __str__(self):
-        return f"ML Dataset - Student {self.student_id}"
+        """String representation of ML dataset."""
+        return f"StudentMLDataset: ML{self.student_id} - {self.snapshot_date}"
+
+
+# ==============================================================================
+# 5. AI INSIGHTS & OUTPUTS
+# ==============================================================================
 
 
 class Recommendation(models.Model):
-    """AI output used by backend"""
+    """Actionable insights generated by the AI for the user."""
 
     child = models.ForeignKey(
         ChildProfile,
         on_delete=models.PROTECT,
         related_name="recommendations",
-        help_text="Child receiving recommendation",
+        help_text="Target child",
     )
     lesson = models.ForeignKey(
-        lesson,
+        "lessons.Lesson",
         on_delete=models.PROTECT,
         related_name="recommendations",
         help_text="Recommended lesson",
     )
     confidence_score = models.FloatField(
         validators=[MinValueValidator(0), MaxValueValidator(1)],
-        help_text="Confidence score (0-1)",
+        help_text="AI confidence (0-1)",
     )
     reason = models.TextField(
-        null=True, blank=True, help_text="Explanation for recommendation"
+        null=True, blank=True, help_text="Why this was recommended"
     )
     model = models.ForeignKey(
         MLModel,
@@ -399,17 +601,25 @@ class Recommendation(models.Model):
         null=True,
         blank=True,
         related_name="recommendations",
-        help_text="ML model that generated recommendation",
+        help_text="Model used for prediction",
     )
     generated_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = "ml_recommendation"
+        ordering = ["-confidence_score"]
         indexes = [
             models.Index(fields=["child", "-confidence_score"]),
             models.Index(fields=["generated_at"]),
         ]
-        ordering = ["-confidence_score"]
 
     def __str__(self):
-        return f"Recommend {self.lesson.title} for {self.child.user.username}"
+        """String representation of recommendation."""
+        child_name = (
+            self.child.user.username if self.child and self.child.user else "Unknown"
+        )
+        return (
+            f"Recommendation {self.id}: "
+            f"{self.lesson.title} for {child_name} "
+            f"(confidence: {self.confidence_score:.2f})"
+        )
