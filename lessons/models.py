@@ -82,6 +82,9 @@ class MediaUpload(models.Model):
         IMAGE_PNG = "image/png", "PNG Image"
         IMAGE_JPG = "image/jpg", "JPG Image"
 
+    lesson = models.ForeignKey(
+        Lesson, on_delete=models.CASCADE, related_name="media_uploads"
+    )
     uploader = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
