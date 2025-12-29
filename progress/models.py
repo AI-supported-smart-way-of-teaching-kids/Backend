@@ -1,11 +1,12 @@
 from django.db import models
 
-from lessons.models import lesson
+# Local app imports separated by a blank line
+from lessons.models import Lesson  # Fixed: PascalCase
 from profiles.models import ChildProfile
 
 
 class Progress(models.Model):
-    """Per-child per-lesson status"""
+    """Per-child per-lesson status tracking."""
 
     class Status(models.TextChoices):
         NOT_STARTED = "not-started", "Not Started"
@@ -19,7 +20,7 @@ class Progress(models.Model):
         help_text="Child's progress",
     )
     lesson = models.ForeignKey(
-        lesson,
+        Lesson,  # Fixed: PascalCase
         on_delete=models.PROTECT,
         related_name="progress",
         help_text="Lesson being tracked",
@@ -53,11 +54,11 @@ class Progress(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.child.user.username} - {self.lesson.title} - {self.status}"
+        return f"{self.child.nickname} - {self.lesson.title} - {self.status}"
 
 
 class Badge(models.Model):
-    """Badge definition"""
+    """Badge definition for gamification achievements."""
 
     name = models.CharField(max_length=100, unique=True, help_text="Badge name")
     description = models.TextField(null=True, blank=True, help_text="Badge description")
@@ -72,7 +73,7 @@ class Badge(models.Model):
 
 
 class ChildBadge(models.Model):
-    """Awarded badge for a child"""
+    """Records which badges have been awarded to which children."""
 
     child = models.ForeignKey(
         ChildProfile,
@@ -101,4 +102,4 @@ class ChildBadge(models.Model):
         ordering = ["-awarded_at"]
 
     def __str__(self):
-        return f"{self.child.user.username} - {self.badge.name}"
+        return f"{self.child.nickname} - {self.badge.name}"
