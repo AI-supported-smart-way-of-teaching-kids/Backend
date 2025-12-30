@@ -15,14 +15,33 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 
+# kids_App/urls.py
 import debug_toolbar
+from django.conf import settings
+from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
-
-admin.site.site_header = "kids_App Admin"
-admin.site.index_title = "Admin"
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    # API apps
+    path("api/profiles/", include("profiles.urls")),
+    path("api/lessons/", include("lessons.urls")),
+    path("api/quizzes/", include("quizzes.urls")),
+    path("api/progress/", include("progress.urls")),
+    path("api/ai/", include("ai.urls")),
+    path("api/core/", include("core.urls")),
     path("__debug__/", include(debug_toolbar.urls)),
+    # OpenAPI schema + Swagger UI (drf-spectacular)
+    path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
+    path(
+        "api/docs/",
+        SpectacularSwaggerView.as_view(url_name="schema"),
+        name="swagger-ui",
+    ),
 ]
+
+# Serve media files in development
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

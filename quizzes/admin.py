@@ -1,16 +1,16 @@
 from django.contrib import admin
 
 # from django.utils.html import format_html
+from django.db.models.aggregates import Count
 
-from .models import Quiz, Question, QuizAttempt
-
+from .models import Question, Quiz, QuizAttempt
 
 # ==============================================================================
 # Question Inline (inside Quiz)
 # ==============================================================================
 
 
-class QuestionInline(admin.TabularInline):
+class QuestionInline(admin.StackedInline):
     model = Question
     extra = 1
     ordering = ("order",)
@@ -43,8 +43,13 @@ class QuizAdmin(admin.ModelAdmin):
     ordering = ("-created_at",)
     inlines = [QuestionInline]
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.annotate(question_count=Count("questions"))
+
+    @admin.display(ordering="question_count", description="Questions")
     def question_count(self, obj):
-        return obj.questions.count()
+        return obj.question_count
 
     question_count.short_description = "Questions"
 
@@ -59,6 +64,7 @@ class QuestionAdmin(admin.ModelAdmin):
     list_display = (
         "order",
         "quiz",
+        "media_url",
         "question_type",
         "short_question",
         "correct_option_index",
@@ -67,6 +73,7 @@ class QuestionAdmin(admin.ModelAdmin):
     search_fields = ("question_text",)
     ordering = ("quiz", "order")
 
+    @admin.display(description="Question")
     def short_question(self, obj):
         return obj.question_text[:60]
 

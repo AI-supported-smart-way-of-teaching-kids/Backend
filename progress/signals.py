@@ -1,7 +1,9 @@
 import logging
+
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from .models import Progress, Badge, ChildBadge
+
+from .models import Badge, ChildBadge, Progress
 
 # Set up logging to track achievements without using 'print'
 logger = logging.getLogger(__name__)
