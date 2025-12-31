@@ -1,7 +1,21 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
-from .models import User, ChildProfile, TeacherProfile
+from .models import ChildProfile, TeacherProfile, User
+
+
+class ChildProfileInline(admin.StackedInline):
+    model = ChildProfile
+    extra = 0
+    can_delete = False
+    readonly_fields = ("uuid", "created_at", "updated_at")
+
+
+class TeacherProfileInline(admin.StackedInline):
+    model = TeacherProfile
+    extra = 0
+    can_delete = False
+    readonly_fields = ("created_at",)
 
 
 @admin.register(User)

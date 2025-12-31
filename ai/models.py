@@ -12,7 +12,6 @@ from django.db import models
 
 from profiles.models import ChildProfile
 
-
 # ==============================================================================
 # 1. SYSTEM CONFIGURATION & MAPPING
 # ==============================================================================

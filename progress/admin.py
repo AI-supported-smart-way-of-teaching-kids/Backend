@@ -1,8 +1,7 @@
 from django.contrib import admin
 from django.utils.timezone import localtime
 
-from .models import Progress, Badge, ChildBadge
-
+from .models import Badge, ChildBadge, Progress
 
 # ==============================================================================
 # Progress Admin

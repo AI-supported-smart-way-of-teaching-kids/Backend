@@ -95,7 +95,7 @@ class Question(models.Model):
         ordering = ["order"]
         constraints = [
             models.CheckConstraint(
-                check=models.Q(correct_option_index__gte=0),
+                condition=models.Q(correct_option_index__gte=0),
                 name="correct_option_index_non_negative",
             )
         ]

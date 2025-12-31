@@ -1,22 +1,23 @@
 from django.contrib import admin
 
-# from django.utils.timezone import localtime
-
 from .models import (
+    LessonFeatures,
+    LessonInteractionsClean,
+    LessonInteractionsRaw,
     MLModel,
     MLStudentMap,
-    LessonInteractionsRaw,
-    QuizAttemptsRaw,
-    ProgressRaw,
-    LessonInteractionsClean,
-    QuizAttemptsClean,
     ProgressClean,
-    LessonFeatures,
-    QuizFeatures,
     ProgressLabeled,
-    StudentMLDataset,
+    ProgressRaw,
+    QuizAttemptsClean,
+    QuizAttemptsRaw,
+    QuizFeatures,
     Recommendation,
+    StudentMLDataset,
 )
+
+# from django.utils.timezone import localtime
+
 
 # ==============================================================================
 # 1. MODEL CONFIGURATION
