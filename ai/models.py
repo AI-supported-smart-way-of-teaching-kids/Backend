@@ -192,7 +192,8 @@ class ProgressRaw(BaseInteractionModel):
     streak_days = models.IntegerField(help_text="Current login streak in days")
     topic_mastery = models.FloatField(help_text="Raw mastery score (unclipped)")
     received_at = models.DateTimeField(
-        auto_now_add=True, help_text="Timestamp of log entry"
+        auto_now_add=True, 
+        help_text="Timestamp of log entry"
     )
 
     class Meta:
