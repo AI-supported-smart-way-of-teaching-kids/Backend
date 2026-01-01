@@ -23,6 +23,9 @@ from django.contrib import admin
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
+admin.site.site_header = "Kids_app"
+admin.site.index_title = "Admin"
+
 urlpatterns = [
     path("admin/", admin.site.urls),
     # API apps
@@ -30,7 +33,9 @@ urlpatterns = [
     path("api/lessons/", include("lessons.urls")),
     path("api/quizzes/", include("quizzes.urls")),
     path("api/progress/", include("progress.urls")),
-    path("api/ai/", include("ai.urls")),
+    path('api/ai/', include('ai.urls')),             # Note the trailing slash
+    path('api/ml_online/', include('ml_online.urls')),
+    path('api/ml_offline/', include('ml_offline.urls')),
     path("api/core/", include("core.urls")),
     path("__debug__/", include(debug_toolbar.urls)),
     # OpenAPI schema + Swagger UI (drf-spectacular)
