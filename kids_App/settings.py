@@ -47,6 +47,8 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "debug_toolbar",
     "ai.apps.AiConfig",
+    "ml_offline.apps.MlOfflineConfig",
+    "ml_online.apps.MlOnlineConfig",
     "lessons.apps.LessonsConfig",
     "core.apps.CoreConfig",
     "profiles.apps.ProfilesConfig",
@@ -107,6 +109,7 @@ DATABASES = {
         "PORT": "5432",
     }
 }
+
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")

@@ -1,22 +1,12 @@
-# ai/urls.py
-from django.urls import include, path
+from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-
-from .views import (
-    MLDataIngestionView,
-    MLModelViewSet,
-    MLStudentMapViewSet,
-    RecommendationViewSet,
-)
+from .views import MLModelViewSet, MLStudentMapViewSet, RecommendationViewSet
 
 router = DefaultRouter()
-router.register(r"recommendations", RecommendationViewSet, basename="recommendation")
-router.register(r"ml-student-maps", MLStudentMapViewSet, basename="ml-student-map")
-router.register(r"ml-models", MLModelViewSet, basename="ml-model")
+router.register(r"models", MLModelViewSet)
+router.register(r"student-maps", MLStudentMapViewSet)
+router.register(r"recommendations", RecommendationViewSet)
 
 urlpatterns = [
-    # ML ingestion endpoint (POST JSON list or single)
-    path("ml/ingest/<str:data_type>/", MLDataIngestionView.as_view(), name="ml-ingest"),
-    # Router
-    path("", include(router.urls)),
+    path("ml/", include(router.urls)),
 ]
