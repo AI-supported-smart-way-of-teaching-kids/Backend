@@ -1,139 +1,103 @@
-# profiles/views.py
 import logging
-
 from django.contrib.auth import authenticate
-from drf_spectacular.utils import extend_schema
 from rest_framework import generics, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.viewsets import ModelViewSet
+from rest_framework.exceptions import PermissionDenied
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from core.models import AuditLog
-
 from .models import ChildProfile, TeacherProfile, User
 from .serializers import (
-    ChildProfileCreateSerializer,
-    ChildProfileSerializer,
-    LoginSerializer,
-    TeacherProfileSerializer,
-    UserRegistrationSerializer,
     UserSerializer,
+    UserRegistrationSerializer,
+    LoginSerializer,
+    ChildProfileCreateSerializer,
+    ChildProfileParentSerializer,
+    ChildProfilePublicSerializer,
+    TeacherProfileSerializer,
 )
 
 logger = logging.getLogger(__name__)
 
 
-# -----------------------------------------------------------------------------
-# User viewset
-# -----------------------------------------------------------------------------
-class UserViewSet(ModelViewSet):
-    """
-    Manage users. Admins can list all users; regular users can view/update only themselves.
-    """
-
-    queryset = User.objects.all().order_by("-date_joined")
+# -----------------------
+# User Views
+# -----------------------
+class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user
-        if getattr(user, "is_admin", False):
+        if user.role == User.Role.ADMIN:
             return User.objects.all().order_by("-date_joined")
         return User.objects.filter(id=user.id)
 
-    @action(detail=False, methods=["get", "put"], permission_classes=[IsAuthenticated])
+    @action(detail=False, methods=["get", "put"])
     def profile(self, request):
-        """Retrieve or update current user's profile."""
+        # GET → read-only (FIXED)
         if request.method == "GET":
             serializer = self.get_serializer(request.user)
-            return Response(serializer.data)
+            return Response(serializer.data, status=status.HTTP_200_OK)
 
+        # PUT → update
         serializer = self.get_serializer(request.user, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-# -----------------------------------------------------------------------------
-# Register - Create user and return tokens
-# -----------------------------------------------------------------------------
-@extend_schema(request=UserRegistrationSerializer, responses={201: UserSerializer})
 class RegisterView(generics.CreateAPIView):
-    """
-    Create a new user (registration). Uses UserRegistrationSerializer so Swagger shows fields.
-    """
-
     serializer_class = UserRegistrationSerializer
     permission_classes = [AllowAny]
 
     def perform_create(self, serializer):
-        # Use serializer.create to create and hash password
-        user = serializer.save()
+        self.user = serializer.save()
         AuditLog.objects.create(
-            user=user,
+            user=self.user,
             action="USER_REGISTERED",
-            resource_id=str(user.id),
-            meta={"email": user.email},
+            resource_id=str(self.user.id),
+            meta={"email": self.user.email},
         )
-        self.created_user = user
 
     def create(self, request, *args, **kwargs):
-        response = super().create(request, *args, **kwargs)
-        user = getattr(self, "created_user", None)
-        refresh = RefreshToken.for_user(user)
-        response.data = {
-            "user": UserSerializer(user).data,
-            "access": str(refresh.access_token),
-            "refresh": str(refresh),
-        }
-        return response
+        super().create(request, *args, **kwargs)
+        refresh = RefreshToken.for_user(self.user)
+        return Response(
+            {
+                "user": UserSerializer(self.user).data,
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
-# -----------------------------------------------------------------------------
-# Login - authenticate & return tokens
-# -----------------------------------------------------------------------------
-@extend_schema(
-    request=LoginSerializer,
-    responses={
-        200: {
-            "type": "object",
-            "properties": {"access": {"type": "string"}, "refresh": {"type": "string"}},
-        }
-    },
-)
 class LoginView(generics.GenericAPIView):
-    """
-    Login endpoint (email + password). Uses LoginSerializer so Swagger shows request body.
-    """
-
     serializer_class = LoginSerializer
     permission_classes = [AllowAny]
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        email = serializer.validated_data["email"]
-        password = serializer.validated_data["password"]
+        user = authenticate(
+            request,
+            username=serializer.validated_data["email"],
+            password=serializer.validated_data["password"],
+        )
 
-        user = authenticate(request, username=email, password=password)
         if not user:
-            AuditLog.objects.create(
-                action="LOGIN_FAILED",
-                meta={"email": email, "ip": request.META.get("REMOTE_ADDR")},
-            )
+            AuditLog.objects.create(action="LOGIN_FAILED")
             return Response(
                 {"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED
             )
 
         refresh = RefreshToken.for_user(user)
         AuditLog.objects.create(
-            user=user,
-            action="LOGIN_SUCCESS",
-            resource_id=str(user.id),
-            meta={"ip": request.META.get("REMOTE_ADDR")},
+            user=user, action="LOGIN_SUCCESS", resource_id=str(user.id)
         )
 
         return Response(
@@ -141,67 +105,73 @@ class LoginView(generics.GenericAPIView):
                 "user": UserSerializer(user).data,
                 "access": str(refresh.access_token),
                 "refresh": str(refresh),
-            },
-            status=status.HTTP_200_OK,
+            }
         )
 
 
-# -----------------------------------------------------------------------------
-# Child profile viewset
-# -----------------------------------------------------------------------------
-class ChildProfileViewSet(ModelViewSet):
-    """
-    Parents manage their children; admins can see all.
-    - create: parent is attached from request.user
-    - list: parents see only their children
-    """
-
+# -----------------------
+# Child Profile ViewSet
+# -----------------------
+class ChildProfileViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
-
-    def get_serializer_class(self):
-        return (
-            ChildProfileCreateSerializer
-            if self.action in ("create", "update", "partial_update")
-            else ChildProfileSerializer
-        )
 
     def get_queryset(self):
         user = self.request.user
-        if getattr(user, "is_admin", False):
-            return ChildProfile.objects.all().order_by("-created_at")
-        if getattr(user, "is_parent", False):
-            return ChildProfile.objects.filter(parent=user).order_by("-created_at")
+        if user.role == User.Role.ADMIN:
+            return ChildProfile.objects.all()
+        if user.role == User.Role.PARENT:
+            return ChildProfile.objects.filter(parent=user)
+        if user.role == User.Role.TEACHER:
+            return ChildProfile.objects.all()
         return ChildProfile.objects.none()
 
-    def get_serializer_context(self):
-        # include request for serializers that need it
-        return {"request": self.request}
+    def get_serializer_class(self):
+        user = self.request.user
+        if self.action in ("create", "update", "partial_update"):
+            return ChildProfileCreateSerializer
+        if user.role in (User.Role.PARENT, User.Role.ADMIN):
+            return ChildProfileParentSerializer
+        return ChildProfilePublicSerializer
 
     def perform_create(self, serializer):
+        if self.request.user.role != User.Role.PARENT:
+            raise PermissionDenied("Only parents can create child profiles.")
         serializer.save(parent=self.request.user)
 
-    @action(detail=True, methods=["get"], permission_classes=[IsAuthenticated])
+    def perform_update(self, serializer):
+        if self.request.user.role != User.Role.PARENT:
+            raise PermissionDenied("Only parents can update child profiles.")
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        if self.request.user.role != User.Role.PARENT:
+            raise PermissionDenied("Only parents can delete child profiles.")
+        instance.delete()
+
+    @action(detail=True, methods=["get"])
     def progress(self, request, pk=None):
-        """
-        Return progress for a specific child (used by frontend/ML).
-        """
+        # FETCH CHILD WITHOUT ROLE FILTER (FIXED)
+        child = ChildProfile.objects.filter(uuid=pk).first()
+        if not child:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        # PERMISSION CHECK AFTER EXISTENCE
+        if request.user.role == User.Role.PARENT and child.parent != request.user:
+            raise PermissionDenied("Access denied.")
+
         from progress.models import Progress
         from progress.serializers import ProgressSerializer
 
-        child = self.get_object()
         qs = Progress.objects.filter(child=child)
-        serializer = ProgressSerializer(qs, many=True)
-        return Response(serializer.data)
+        return Response(
+            ProgressSerializer(qs, many=True).data, status=status.HTTP_200_OK
+        )
 
 
-# -----------------------------------------------------------------------------
-# Teacher profile viewset
-# -----------------------------------------------------------------------------
+# -----------------------
+# Teacher Profile ViewSet (read-only)
+# -----------------------
 class TeacherProfileViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    Read-only listing of teacher profiles. Requires authenticated user.
-    """
-
     queryset = TeacherProfile.objects.all().order_by("-created_at")
     serializer_class = TeacherProfileSerializer
     permission_classes = [IsAuthenticated]

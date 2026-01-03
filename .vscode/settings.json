@@ -1,4 +1,16 @@
 {
     "python.pythonPath": "C:/Users/HP EliteBook/.virtualenvs/AI-supported_teaching_kids-aSQZ5zQF/Scripts/python.exe",
-    "python.terminal.activateEnvironment": true
+    "python.terminal.activateEnvironment": true,
+    "[python]": {
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.codeActionsOnSave": {
+            "source.fixAll.ruff": "explicit",
+            "source.organizeImports.ruff": "explicit"
+        }
+    },
+    "python.testing.pytestArgs": [
+        "profiles"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true
 }

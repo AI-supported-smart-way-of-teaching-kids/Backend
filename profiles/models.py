@@ -151,6 +151,7 @@ class ChildProfile(models.Model):
 
     class Meta:
         db_table = "profiles_childprofile"
+        ordering = ["id"]
         indexes = [
             models.Index(fields=["uuid"]),
         ]
