@@ -22,6 +22,7 @@ pytest-cov = "*"
 factory-boy = "*"
 autoflake = "*"
 autopep8 = "*"
+pre-commit = "*"
 
 [dev-packages]
 
