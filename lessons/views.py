@@ -1,4 +1,3 @@
-# lessons/views.py
 import logging
 
 from django.shortcuts import get_object_or_404
@@ -21,60 +20,81 @@ from .serializers import (
 
 logger = logging.getLogger(__name__)
 
+# =============================================================================
+# PERMISSIONS
+# =============================================================================
 
-# -----------------------------------------------------------------------------
-# Custom permission
-# -----------------------------------------------------------------------------
+
 class IsTeacherOrAdmin(IsAuthenticated):
+    """
+    Allows access only to authenticated users who are teachers or admins.
+    """
+
     def has_permission(self, request, view):
         user = request.user
-        return bool(
-            user
-            and user.is_authenticated
-            and (getattr(user, "is_admin", False) or getattr(user, "is_teacher", False))
-        )
+        if not user or not user.is_authenticated:
+            return False
+
+        return getattr(user, "is_admin", False) or getattr(user, "is_teacher", False)
 
 
-# -----------------------------------------------------------------------------
-# Collection
-# -----------------------------------------------------------------------------
+# =============================================================================
+# COLLECTION VIEWSET
+# =============================================================================
+
+
 class CollectionViewSet(ModelViewSet):
-    queryset = Collection.objects.all().order_by("-created_at")
+    """
+    Manage lesson collections.
+    """
+
+    queryset = Collection.objects.prefetch_related("lessons").order_by("-created_at")
     serializer_class = CollectionSerializer
     permission_classes = [AllowAny]
 
     filter_backends = [SearchFilter, OrderingFilter]
-    search_fields = ["title", "description"]
-    ordering_fields = ["title", "created_at"]
+    search_fields = ("title", "description")
+    ordering_fields = ("title", "created_at")
 
 
-# -----------------------------------------------------------------------------
-# Lesson
-# -----------------------------------------------------------------------------
+# =============================================================================
+# LESSON VIEWSET
+# =============================================================================
+
+
 class LessonViewSet(ModelViewSet):
-    queryset = Lesson.objects.all().order_by("-created_at")
+    """
+    Manage lessons and track student progress.
+    """
+
+    queryset = (
+        Lesson.objects.select_related("teacher", "teacher__user", "collection")
+        .prefetch_related("media_uploads")
+        .order_by("-created_at")
+    )
 
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ["difficulty", "teacher", "collection", "is_published"]
-    search_fields = ["title", "description", "tags"]
-    ordering_fields = ["created_at", "title"]
+    filterset_fields = ("difficulty", "teacher", "collection", "is_published")
+    search_fields = ("title", "description", "tags")
+    ordering_fields = ("created_at", "title")
+
+    # -------------------- Permissions & Serializers --------------------
 
     def get_permissions(self):
-        if self.action in ("create", "update", "partial_update", "destroy"):
+        if self.action in {"create", "update", "partial_update", "destroy"}:
             return [IsTeacherOrAdmin()]
         return [AllowAny()]
 
     def get_serializer_class(self):
-        if self.action in ("create", "update", "partial_update"):
+        if self.action in {"create", "update", "partial_update"}:
             return LessonCreateSerializer
         return LessonSerializer
 
     def get_serializer_context(self):
         return {"request": self.request}
 
-    # -------------------------------------------------------------------------
-    # Track lesson progress (Swagger-friendly)
-    # -------------------------------------------------------------------------
+    # -------------------- Custom Actions --------------------
+
     @action(
         detail=True,
         methods=["post"],
@@ -83,17 +103,9 @@ class LessonViewSet(ModelViewSet):
     )
     def track_progress(self, request, pk=None):
         """
-        POST body:
-        {
-          "child_id": 1,
-          "completion_status": true,
-          "time_spent": 120,
-          "video_watch_percentage": 80,
-          "number_of_clicks": 5
-        }
+        Track child progress for a lesson.
         """
         from profiles.models import ChildProfile
-        from progress.models import Progress
 
         lesson = self.get_object()
         child_id = request.data.get("child_id")
@@ -105,6 +117,22 @@ class LessonViewSet(ModelViewSet):
             )
 
         child = get_object_or_404(ChildProfile, id=child_id)
+
+        self._update_progress(request, child, lesson)
+        self._log_ml_interaction(request, child, lesson)
+
+        return Response(
+            {"detail": "Progress tracked"},
+            status=status.HTTP_200_OK,
+        )
+
+    # -------------------- Helpers --------------------
+
+    def _update_progress(self, request, child, lesson):
+        """
+        Create or update Progress record.
+        """
+        from progress.models import Progress
 
         progress, _ = Progress.objects.get_or_create(
             child=child,
@@ -118,12 +146,17 @@ class LessonViewSet(ModelViewSet):
 
         progress.last_accessed = timezone.now()
         progress.save()
+        return progress
 
-        # -------------------- Optional ML raw event --------------------
+    def _log_ml_interaction(self, request, child, lesson):
+        """
+        Log ML-related lesson interaction data.
+        """
         try:
             from ai.models import LessonInteractionsRaw, MLStudentMap
 
             ml_map = MLStudentMap.objects.filter(child=child).first()
+
             LessonInteractionsRaw.objects.create(
                 ml_student_id=getattr(ml_map, "ml_student_id", 0),
                 student_uuid=str(child.uuid),
@@ -136,38 +169,46 @@ class LessonViewSet(ModelViewSet):
                 number_of_clicks=int(request.data.get("number_of_clicks", 0)),
                 completion_status=bool(request.data.get("completion_status", False)),
             )
-        except Exception as e:
-            logger.warning("ML event skipped: %s", e)
-
-        return Response({"detail": "Progress tracked"}, status=status.HTTP_200_OK)
+        except Exception as exc:
+            logger.warning("ML event skipped: %s", exc)
 
 
-# -----------------------------------------------------------------------------
-# Media upload
-# -----------------------------------------------------------------------------
+# =============================================================================
+# MEDIA UPLOAD VIEWSET
+# =============================================================================
+
+
 class MediaUploadViewSet(ModelViewSet):
-    queryset = MediaUpload.objects.all().order_by("-created_at")
+    """
+    Handle lesson-related media uploads.
+    """
+
     serializer_class = MediaUploadSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user
+        queryset = MediaUpload.objects.select_related("lesson", "uploader")
+
         if getattr(user, "is_admin", False):
-            return MediaUpload.objects.all()
-        return MediaUpload.objects.filter(uploader=user)
+            return queryset.order_by("-created_at")
+
+        return queryset.filter(uploader=user).order_by("-created_at")
 
     def get_serializer_context(self):
         return {"request": self.request}
 
     def perform_create(self, serializer):
         user = self.request.user
-        lesson = serializer.validated_data.get("lesson")
+        lesson = serializer.validated_data["lesson"]
 
         if not getattr(user, "is_admin", False):
-            if not lesson.teacher or lesson.teacher.user != user:
-                return Response(
-                    {"detail": "You can upload media only to your own lessons"},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+            self._validate_lesson_ownership(user, lesson)
 
         serializer.save(uploader=user)
+
+    def _validate_lesson_ownership(self, user, lesson):
+        """
+        Ensure only lesson owners can upload media.
+
+        """
