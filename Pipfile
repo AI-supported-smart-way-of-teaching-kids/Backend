@@ -15,8 +15,6 @@ djangorestframework-simplejwt = "*"
 django-filter = "*"
 requests = "*"
 isort = "*"
-pytest = "*"
-pytest-django = "*"
 pytest-cov = "*"
 factory-boy = "*"
 autoflake = "*"
@@ -26,6 +24,8 @@ model-bakery = "*"
 coverage = "*"
 ruff = "*"
 django = "*"
+pytest = "*"
+pytest-django = "*"
 
 [dev-packages]
 
