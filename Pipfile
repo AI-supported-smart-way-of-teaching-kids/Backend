@@ -24,8 +24,8 @@ model-bakery = "*"
 coverage = "*"
 ruff = "*"
 django = "*"
-pytest = "*"
 pytest-django = "*"
+pytest = "*"
 
 [dev-packages]
 
