@@ -23,6 +23,9 @@ factory-boy = "*"
 autoflake = "*"
 autopep8 = "*"
 pre-commit = "*"
+model-bakery = "*"
+coverage = "*"
+ruff = "*"
 
 [dev-packages]
 

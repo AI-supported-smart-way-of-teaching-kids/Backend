@@ -26,7 +26,7 @@ class Command(BaseCommand):
                 number_of_clicks=secrets.randbelow(41) + 10,  # 10..50
                 completion_status=True,
             )
-            self.stdout.write(f"Logged Lesson {100+i}: Spent {time_spent:.2f} mins")
+            self.stdout.write(f"Logged Lesson {100 + i}: Spent {time_spent:.2f} mins")
 
         # 2. Check the "Online" result (This proves the Signal worked!)
         agg = StudentRealtimeAggregate.objects.get(ml_student_id=student_id)

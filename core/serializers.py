@@ -4,7 +4,7 @@ from .models import AuditLog
 
 
 class AuditLogSerializer(serializers.ModelSerializer):
-    user_name = serializers.CharField(source="user.username", read_only=True)
+    user_name = serializers.SerializerMethodField()
 
     class Meta:
         model = AuditLog
@@ -18,3 +18,6 @@ class AuditLogSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = ["id", "created_at"]
+
+    def get_user_name(self, obj):
+        return obj.user.username if obj.user else None
