@@ -4,7 +4,6 @@ verify_ssl = true
 name = "pip_conf_index_global"
 
 [packages]
-django = "*"
 django-debug-toolbar = "*"
 black = "*"
 flake8 = "*"
@@ -26,6 +25,7 @@ pre-commit = "*"
 model-bakery = "*"
 coverage = "*"
 ruff = "*"
+django = "*"
 
 [dev-packages]
 
