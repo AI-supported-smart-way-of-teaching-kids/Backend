@@ -38,7 +38,6 @@ urlpatterns = [
     path("api/ml_offline/", include("ml_offline.urls")),
     path("api/core/", include("core.urls")),
     path("__debug__/", include(debug_toolbar.urls)),
-    # OpenAPI schema + Swagger UI (drf-spectacular)
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path(
         "api/docs/",

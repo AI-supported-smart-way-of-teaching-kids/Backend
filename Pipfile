@@ -26,8 +26,12 @@ model-bakery = "*"
 coverage = "*"
 ruff = "*"
 django = "*"
+pillow = "*"
+redis = "*"
+celery = "*"
 
 [dev-packages]
+locust = "*"
 
 [requires]
 python_version = "3.13"
