@@ -20,11 +20,22 @@ class QuizViewSet(ModelViewSet):
 
     queryset = Quiz.objects.all()
     serializer_class = QuizSerializer
-    permission_classes = [IsAdminUser]  # Only admin can create/update/delete
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["id", "title", "lesson"]
     search_fields = ["title"]
     ordering_fields = ["created_at", "title"]
+
+    def get_permissions(self):
+        """
+        Instantiates and returns the list of permissions that this view requires.
+        - 'list' and 'retrieve' (GET): Allow any logged-in user (Parent/Child).
+        - 'create', 'update', 'partial_update', 'destroy': Only Admins.
+        """
+        if self.action in ["list", "retrieve"]:
+            permission_classes = [IsAuthenticated]
+        else:
+            permission_classes = [IsAdminUser]
+        return [permission() for permission in permission_classes]
 
     def get_serializer_context(self):
         return {"request": self.request}

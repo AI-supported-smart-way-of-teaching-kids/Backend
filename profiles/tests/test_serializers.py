@@ -36,21 +36,23 @@ def teacher_user(db):
 
 
 @pytest.fixture
+def teacher_profile(teacher_user):
+    # Delete any existing profile to avoid unique constraint errors
+    TeacherProfile.objects.filter(user=teacher_user).delete()
+    return TeacherProfile.objects.create(
+        user=teacher_user,
+        bio="Math teacher",
+        uploaded_count=3,
+    )
+
+
+@pytest.fixture
 def child(parent_user):
     return ChildProfile.objects.create(
         parent=parent_user,
         nickname="Kid One",
         age=5,
         learning_level=ChildProfile.LearningLevel.BEGINNER,
-    )
-
-
-@pytest.fixture
-def teacher_profile(teacher_user):
-    return TeacherProfile.objects.create(
-        user=teacher_user,
-        bio="Math teacher",
-        uploaded_count=3,
     )
 
 

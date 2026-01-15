@@ -28,7 +28,7 @@ SECRET_KEY = "django-insecure-svqz6!xj1od1(r8*%b4dv2&(z#9boc%og$$$$i(w!sf_hvtu!_
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["192.168.8.198", "127.0.0.1", "localhost"]
 
 
 # Application definition
@@ -186,8 +186,14 @@ SPECTACULAR_SETTINGS = {
 }
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
+    "http://localhost:8081",  # For Web Browser/Emulator
+    "http://127.0.0.1:8081",  # For Web Browser/Emulator
+    "http://192.168.8.198:8081",  # IMPORTANT: For Physical Phone
+    # ADD THESE FOR THE NEW PORT 8082
+    "http://localhost:8082",
+    "http://127.0.0.1:8082",
+    "http://192.168.8.198:8082",
 ]
 # or to allow everything in dev:
 # CORS_ALLOW_ALL_ORIGINS = True
+CELERY_BROKER_URL = "redis://localhost:6379/1"

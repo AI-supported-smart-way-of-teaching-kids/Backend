@@ -6,7 +6,6 @@ class ProfilesConfig(AppConfig):
     name = "profiles"
     verbose_name = "Accounts"
 
-
-""" def ready(self):
+    def ready(self):
         # Imports the signals so they are registered when Django starts
-        import profiles.signals"""
+        import profiles.signals  # noqa: F401

@@ -146,19 +146,22 @@ class TestTeacherProfileModel:
 
     def test_teacher_profile_one_to_one(self):
         """Test linking a teacher profile to a user"""
-        user = User.objects.create_user(
+        user, _ = User.objects.get_or_create(
             email="teacher@school.com",
-            username="teacher1",
-            password=TEST_PASSWORD,
-            role=User.Role.TEACHER,
+            defaults={
+                "username": "teacher1",
+                "password": TEST_PASSWORD,
+                "role": User.Role.TEACHER,
+            },
         )
-        profile = TeacherProfile.objects.create(user=user, bio="Expert in AI for kids")
 
-        if profile.user.email != "teacher@school.com":
-            pytest.fail("Expected profile.user.email to be 'teacher@school.com'")
-        if user.teacher_profile != profile:
-            pytest.fail("Expected user.teacher_profile to be profile")
-        if profile.uploaded_count != 0:
-            pytest.fail(
-                f"Expected profile.uploaded_count to be 0, got {profile.uploaded_count}"
-            )
+        # Ensure there’s no existing profile
+        TeacherProfile.objects.filter(user=user).delete()
+
+        profile, _ = TeacherProfile.objects.get_or_create(
+            user=user, defaults={"bio": "Expert in AI for kids"}
+        )
+
+        assert profile.user.email == "teacher@school.com"
+        assert user.teacher_profile == profile
+        assert profile.uploaded_count == 0
