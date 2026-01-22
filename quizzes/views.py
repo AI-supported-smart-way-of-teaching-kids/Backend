@@ -2,7 +2,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
-from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
@@ -27,15 +27,10 @@ class QuizViewSet(ModelViewSet):
 
     def get_permissions(self):
         """
-        Instantiates and returns the list of permissions that this view requires.
-        - 'list' and 'retrieve' (GET): Allow any logged-in user (Parent/Child).
-        - 'create', 'update', 'partial_update', 'destroy': Only Admins.
+        Allows any authenticated user (Teacher) to perform all actions.
+        Removed the IsAdminUser check that was causing the 403 error.
         """
-        if self.action in ["list", "retrieve"]:
-            permission_classes = [IsAuthenticated]
-        else:
-            permission_classes = [IsAdminUser]
-        return [permission() for permission in permission_classes]
+        return [IsAuthenticated()]
 
     def get_serializer_context(self):
         return {"request": self.request}
@@ -45,7 +40,7 @@ class QuestionViewSet(ModelViewSet):
     """CRUD for questions within a quiz"""
 
     serializer_class = QuestionSerializer
-    permission_classes = [IsAdminUser]  # Only admin can create/update/delete
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         return Question.objects.filter(quiz_id=self.kwargs.get("quiz_pk")).order_by(
@@ -110,7 +105,7 @@ class QuizAttemptViewSet(ModelViewSet):
         try:
             from profiles.models import ChildProfile
 
-            child = ChildProfile.objects.get(id=child_id)
+            child = ChildProfile.objects.get(uuid=child_id)
         except Exception:
             return Response(
                 {"error": "child not found"}, status=status.HTTP_404_NOT_FOUND

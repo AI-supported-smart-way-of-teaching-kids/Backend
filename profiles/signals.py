@@ -1,14 +1,18 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from .models import TeacherProfile, User
+from django.contrib.auth.models import User
+from .models import TeacherProfile
 
 
 @receiver(post_save, sender=User)
-def create_user_profile(sender, instance, created, **kwargs):
-    """
-    Automates profile creation only for Teachers.
-    Parents will add ChildProfiles manually through the app.
-    """
+def create_teacher_profile(sender, instance, created, **kwargs):
     if created:
-        if instance.role == User.Role.TEACHER:
-            TeacherProfile.objects.create(user=instance)
+        # This automatically creates the profile when a user signs up
+        TeacherProfile.objects.create(user=instance)
+
+
+@receiver(post_save, sender=User)
+def save_teacher_profile(sender, instance, **kwargs):
+    # This ensures the profile is saved if the user is updated
+    if hasattr(instance, "teacherprofile"):
+        instance.teacherprofile.save()

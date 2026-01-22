@@ -57,7 +57,17 @@ class ChildProfileCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ChildProfile
-        fields = ("nickname", "avatar_url", "age", "parent_phone", "learning_level")
+        fields = (
+            "uuid",
+            "nickname",
+            "avatar_url",
+            "age",
+            "parent_phone",
+            "learning_level",
+        )
+        read_only_fields = [
+            "uuid",
+        ]
 
     def validate_age(self, value):
         if not 4 <= value <= 6:
@@ -99,11 +109,23 @@ class ChildProfilePublicSerializer(serializers.ModelSerializer):
 # -----------------------
 # Teacher Serializer
 # -----------------------
+
+
 class TeacherProfileSerializer(serializers.ModelSerializer):
+    # These grab data from the linked User model
     username = serializers.CharField(source="user.username", read_only=True)
     email = serializers.EmailField(source="user.email", read_only=True)
+    user_id = serializers.IntegerField(source="user.id", read_only=True)
 
     class Meta:
         model = TeacherProfile
-        fields = ["id", "username", "email", "bio", "uploaded_count", "created_at"]
-        read_only_fields = ["id", "uploaded_count", "created_at"]
+        fields = [
+            "id",  # This is the TeacherProfile ID (the one that causes 404 if missing)
+            "user_id",  # This is the Auth User ID (25 in your logs)
+            "username",
+            "email",
+            "bio",
+            "uploaded_count",
+            "created_at",
+        ]
+        read_only_fields = ["id", "user_id", "uploaded_count", "created_at"]

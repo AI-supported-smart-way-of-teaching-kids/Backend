@@ -19,6 +19,7 @@ class MediaUploadInline(admin.TabularInline):
     model = MediaUpload
     extra = 0
     fields = (
+        "file",
         "file_url",
         "file_type",
         "status",
@@ -74,8 +75,9 @@ class LessonAdmin(admin.ModelAdmin):
             "Media & Duration",
             {
                 "fields": (
+                    "video",
                     "video_url",
-                    "thumbnail_url",
+                    "thumbnail",
                     "thumbnail_preview",
                     "duration_seconds",
                 )
@@ -91,13 +93,13 @@ class LessonAdmin(admin.ModelAdmin):
     # ===============================
     def thumbnail_preview(self, obj):
         """Show clickable thumbnail image in admin."""
-        if obj.thumbnail_url:
+        if obj.thumbnail:
             return format_html(
                 '<a href="{}" target="_blank">'
                 '<img src="{}" width="100" style="object-fit: cover; border-radius: 5px;" />'
                 "</a>",
-                obj.video_url,
-                obj.thumbnail_url,
+                obj.thumbnail.url,
+                obj.thumbnail.url,
             )
         return "-"
 
