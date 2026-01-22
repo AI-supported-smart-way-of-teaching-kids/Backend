@@ -29,6 +29,7 @@ admin.site.index_title = "Admin"
 urlpatterns = [
     path("admin/", admin.site.urls),
     # API apps
+    path("", include("playground.urls")),
     path("api/profiles/", include("profiles.urls")),
     path("api/lessons/", include("lessons.urls")),
     path("api/quizzes/", include("quizzes.urls")),

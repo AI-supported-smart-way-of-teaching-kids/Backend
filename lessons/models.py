@@ -1,3 +1,4 @@
+import os
 from django.conf import settings
 from django.db import models
 from django.utils.text import slugify
@@ -44,11 +45,19 @@ class Lesson(models.Model):
         max_length=200, unique=True, help_text="URL-friendly identifier"
     )
     description = models.TextField(help_text="Detailed lesson description")
-    video_url = models.URLField(
-        max_length=500, help_text="S3/CDN URL for video content"
+    video = models.FileField(
+        upload_to="videos/", null=True, blank=True, help_text="Uploaded video file"
     )
-    thumbnail_url = models.URLField(
-        max_length=500, null=True, blank=True, help_text="URL for lesson thumbnail"
+    video_url = models.URLField(
+        max_length=500,
+        blank=True,
+        help_text="Optional: External URL if not uploading file",
+    )
+    thumbnail = models.ImageField(
+        upload_to="thumbnails/",
+        null=True,
+        blank=True,
+        help_text="Thumbnail image for lesson",
     )
     duration_seconds = models.IntegerField(
         null=True, blank=True, help_text="Lesson duration in seconds"
@@ -92,6 +101,24 @@ class Lesson(models.Model):
         return f"{self.title} by {self.teacher.user.username}"
 
 
+def get_media_upload_path(instance, filename):
+    """
+    Groups files into 'videos/', 'images/', or 'audios/'
+    based on the file_type attribute.
+    """
+    # 1. Map MIME types to your desired folder names
+    folder_map = {"video": "videos", "image": "images", "audio": "audios"}
+
+    # 2. Extract the category (e.g., 'video' from 'video/mp4')
+    # If file_type is unknown, default to 'others'
+    file_category = instance.file_type.split("/")[0] if instance.file_type else "others"
+    subfolder = folder_map.get(file_category, "others")
+
+    # 3. Return the relative path from MEDIA_ROOT
+    # Note: Do NOT include 'media/' here; Django prepends MEDIA_ROOT automatically.
+    return os.path.join(subfolder, filename)
+
+
 class MediaUpload(models.Model):
     """Upload / transcoding tracker"""
 
@@ -106,9 +133,10 @@ class MediaUpload(models.Model):
         VIDEO_WEBM = "video/webm", "WebM Video"
         IMAGE_PNG = "image/png", "PNG Image"
         IMAGE_JPG = "image/jpg", "JPG Image"
+        AUDIO_MP3 = "audio/mpeg", "MP3 Audio"  # Added for your audios folder
 
     lesson = models.ForeignKey(
-        Lesson, on_delete=models.CASCADE, related_name="media_uploads"
+        "Lesson", on_delete=models.CASCADE, related_name="media_uploads"
     )
     uploader = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -117,7 +145,18 @@ class MediaUpload(models.Model):
         related_name="media_uploads",
         help_text="User who uploaded the file",
     )
-    file_url = models.URLField(max_length=500, help_text="URL of uploaded file")
+
+    # Updated: Now uses the dynamic function
+    file = models.FileField(
+        upload_to=get_media_upload_path,
+        null=True,
+        blank=True,
+        help_text="The actual video/image/audio file being uploaded",
+    )
+
+    file_url = models.URLField(
+        max_length=500, blank=True, help_text="S3/CDN URL if applicable"
+    )
     file_type = models.CharField(
         max_length=50, choices=FileType.choices, help_text="MIME type of the file"
     )

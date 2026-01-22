@@ -6,6 +6,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
 from rest_framework_simplejwt.tokens import RefreshToken
+from django.shortcuts import get_object_or_404
 
 from core.models import AuditLog
 from .models import ChildProfile, TeacherProfile, User
@@ -171,7 +172,31 @@ class ChildProfileViewSet(viewsets.ModelViewSet):
 # -----------------------
 # Teacher Profile ViewSet (read-only)
 # -----------------------
-class TeacherProfileViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = TeacherProfile.objects.all().order_by("-created_at")
+# -----------------------
+# Teacher Profile ViewSet (Updated to allow POST)
+# -----------------------
+class TeacherProfileViewSet(viewsets.ModelViewSet):
+    queryset = TeacherProfile.objects.all()
     serializer_class = TeacherProfileSerializer
     permission_classes = [IsAuthenticated]
+    lookup_field = "user_id"
+
+    def create(self, request, *args, **kwargs):
+        # This looks for an existing profile.
+        # If found, it updates the 'bio'. If not, it creates a new one.
+        profile, created = TeacherProfile.objects.update_or_create(
+            user=request.user, defaults={"bio": request.data.get("bio", "")}
+        )
+
+        serializer = self.get_serializer(profile)
+
+        # This success status (201 or 200) is the "Green Light"
+        # for your React Native app to navigate!
+        status_code = status.HTTP_201_CREATED if created else status.HTTP_200_OK
+        return Response(serializer.data, status=status_code)
+
+    @action(detail=False, methods=["GET"])
+    def me(self, request):
+        profile = get_object_or_404(TeacherProfile, user=request.user)
+        serializer = self.get_serializer(profile)
+        return Response(serializer.data)

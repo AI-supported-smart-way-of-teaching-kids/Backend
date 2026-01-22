@@ -11,25 +11,33 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 import os
+import environ
 from datetime import timedelta
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+env = environ.Env(DEBUG=(bool, False))
+
+environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-svqz6!xj1od1(r8*%b4dv2&(z#9boc%og$$$$i(w!sf_hvtu!_"
+SECRET_KEY = env("SECRET_KEY", default="unsafe-ci-key")
+
+
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env("DEBUG")
 
-ALLOWED_HOSTS = ["192.168.8.198", "127.0.0.1", "localhost"]
 
+ALLOWED_HOSTS = ["*"]
+# ALLOWED_HOSTS = ["192.168.43.111", "127.0.0.1", "localhost"]
 
 # Application definition
 
@@ -102,11 +110,11 @@ WSGI_APPLICATION = "kids_App.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": "kids_ai_teaching",
-        "USER": "mati",
-        "PASSWORD": "mati1234",
-        "HOST": "127.0.0.1",
-        "PORT": "5432",
+        "NAME": env("DB_NAME"),
+        "USER": env("DB_USER"),
+        "PASSWORD": env("DB_PASSWORD"),
+        "HOST": env("DB_HOST"),
+        "PORT": env("DB_PORT"),
     }
 }
 
@@ -188,12 +196,25 @@ SPECTACULAR_SETTINGS = {
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:8081",  # For Web Browser/Emulator
     "http://127.0.0.1:8081",  # For Web Browser/Emulator
-    "http://192.168.8.198:8081",  # IMPORTANT: For Physical Phone
+    "http://192.168.1.217:8081",  # IMPORTANT: For Physical Phone
     # ADD THESE FOR THE NEW PORT 8082
     "http://localhost:8082",
     "http://127.0.0.1:8082",
-    "http://192.168.8.198:8082",
+    "http://192.168.1.217:8082",
+]
+CORS_ALLOW_HEADERS = [
+    "authorization",
+    "content-type",
 ]
 # or to allow everything in dev:
-# CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+
 CELERY_BROKER_URL = "redis://localhost:6379/1"
+
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "localhost"
+EMAIL_HOST_USER = ""
+EMAIL_HOST_PASSWORD = ""
+EMAIL_POST = 2525
+DEFAULT_FROM_EMAIL = "matyostsegay@gmail.com"

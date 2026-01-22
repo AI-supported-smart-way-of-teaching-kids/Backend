@@ -25,7 +25,6 @@ class QuestionSerializer(serializers.ModelSerializer):
 # Quiz Serializer (Updated for Integration)
 # =========================
 class QuizSerializer(serializers.ModelSerializer):
-    # REMOVED read_only=True so Swagger allows POSTing questions
     questions = QuestionSerializer(many=True)
     lesson_title = serializers.CharField(source="lesson.title", read_only=True)
 
@@ -43,20 +42,47 @@ class QuizSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at"]
 
     def create(self, validated_data):
-        """
-        Logic to create Quiz and Questions in one request
-        """
-        # 1. Extract the questions list from the data
         questions_data = validated_data.pop("questions")
-
-        # 2. Create the main Quiz object
         quiz = Quiz.objects.create(**validated_data)
 
-        # 3. Create each Question linked to this Quiz
         for question_data in questions_data:
             Question.objects.create(quiz=quiz, **question_data)
 
         return quiz
+
+    def update(self, instance, validated_data):
+        questions_data = validated_data.pop("questions", [])
+
+        # 1️⃣ Update quiz fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        # 2️⃣ Existing questions map
+        existing_questions = {q.id: q for q in instance.questions.all()}
+
+        sent_question_ids = []
+
+        # 3️⃣ Update or create questions
+        for question_data in questions_data:
+            question_id = question_data.get("id")
+
+            if question_id and question_id in existing_questions:
+                question = existing_questions[question_id]
+                for attr, value in question_data.items():
+                    setattr(question, attr, value)
+                question.save()
+                sent_question_ids.append(question_id)
+            else:
+                new_question = Question.objects.create(quiz=instance, **question_data)
+                sent_question_ids.append(new_question.id)
+
+        # 4️⃣ Delete removed questions
+        for q_id, q_obj in existing_questions.items():
+            if q_id not in sent_question_ids:
+                q_obj.delete()
+
+        return instance
 
 
 # =========================
@@ -98,7 +124,7 @@ class QuizAttemptSubmitSerializer(serializers.Serializer):
     answers = serializers.ListField(
         child=serializers.DictField(), help_text="List of answers"
     )
-    child_id = serializers.IntegerField()
+    child_id = serializers.UUIDField()
 
     def validate_answers(self, value):
         if not value:

@@ -27,6 +27,7 @@ class MediaUploadSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "lesson",
+            "file",
             "file_url",
             "file_type",
             "status",
@@ -35,6 +36,30 @@ class MediaUploadSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = ["id", "status", "uploader", "created_at"]
+
+    def validate(self, attrs):
+        """
+        Custom validation to provide helpful error messages.
+        """
+        # Check if file is provided when creating
+        if not self.instance:  # Creating new upload
+            if "file" not in attrs and "file_url" not in attrs:
+                raise serializers.ValidationError(
+                    {"file": "Either 'file' or 'file_url' must be provided."}
+                )
+
+        # Validate file_type is in allowed choices
+        file_type = attrs.get("file_type")
+        if file_type:
+            valid_types = [choice[0] for choice in MediaUpload.FileType.choices]
+            if file_type not in valid_types:
+                raise serializers.ValidationError(
+                    {
+                        "file_type": f"Invalid file type. Must be one of: {', '.join(valid_types)}"
+                    }
+                )
+
+        return attrs
 
 
 # ------------------------------
@@ -52,8 +77,9 @@ class LessonSerializer(serializers.ModelSerializer):
             "title",
             "slug",
             "description",
+            "video",
             "video_url",
-            "thumbnail_url",
+            "thumbnail",
             "duration_seconds",
             "difficulty",
             "teacher",
@@ -80,8 +106,9 @@ class LessonCreateSerializer(serializers.ModelSerializer):
         fields = [
             "title",
             "description",
+            "video",
             "video_url",
-            "thumbnail_url",
+            "thumbnail",
             "duration_seconds",
             "difficulty",
             "collection",
@@ -90,8 +117,11 @@ class LessonCreateSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, attrs):
-        if not attrs.get("video_url"):
-            raise serializers.ValidationError({"video_url": "video_url is required."})
+        # Allow either video (file) OR video_url (link)
+        if not attrs.get("video") and not attrs.get("video_url"):
+            raise serializers.ValidationError(
+                "Either a video file ('video') or a video URL ('video_url') is required."
+            )
         return attrs
 
     def create(self, validated_data):

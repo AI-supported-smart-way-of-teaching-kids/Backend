@@ -216,8 +216,8 @@ def test_teacher_profile_read_only(api_client, teacher_user):
 
 
 @pytest.mark.django_db
-def test_teacher_profile_cannot_be_created(api_client, teacher_user):
+def test_teacher_profile_can_be_created_or_updated(api_client, teacher_user):
     client = auth_client(api_client, teacher_user)
-    res = client.post("/api/profiles/teachers/", {})
+    res = client.post("/api/profiles/teachers/", {"bio": "New Bio"})
 
-    assert res.status_code in [403, 405]
+    assert res.status_code in [200, 201]
